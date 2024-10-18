@@ -225,28 +225,34 @@ void update_json_response(const char* ip) {
 
 unsigned short get_port(int argc, char* argv[]) {
     const unsigned short DEFAULT_PORT = 25565;
-    
-    if (argc <= 2) {
+   
+    char* error_message = "Invalid CLI option. Use ./honeypot -p <port> (or --port)";
+
+    if (argc == 1) {
         return DEFAULT_PORT;
     }
 
-    char* error_message = "Invalid CLI option. Use ./honeypot -p <port> (or --port)";
-    for (size_t i; i < argc; i++) {
-        if (strcmp(argv[i], "-p") != 0 && strcmp(argv[i], "--port") != 0) {
-            printf("%s", error_message);
-            exit(EXIT_FAILURE);
-        }
-        char* endptr;
-
-        // Attempt to convert the first string
-        unsigned long number = strtoul(argv[i], &endptr, 10);
-        if (endptr == argv[i] || number > 65535) {
-            printf("Invalid port range. (Range is from 0 to 65,535)");
-            exit(EXIT_FAILURE);
-        }
-
-        return (unsigned short)number;
+    if (argc > 3) {
+        printf("%s", error_message);
+        exit(EXIT_FAILURE);
     }
+
+
+    if (strcmp(argv[1], "-p") != 0 && strcmp(argv[1], "--port") != 0) {
+        printf("%s", error_message);
+        exit(EXIT_FAILURE);
+    }
+
+    char* endptr;
+
+    // Attempt to convert the first string
+    unsigned long number = strtoul(argv[1], &endptr, 10);
+    if (endptr == argv[1] || number > 65535) {
+        printf("Invalid port range. (Range is from 0 to 65,535)");
+        exit(EXIT_FAILURE);
+    }
+
+    return (unsigned short)number;
 }
 
 
