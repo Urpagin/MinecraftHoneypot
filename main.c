@@ -173,7 +173,7 @@ int handle_ping(int sockfd, const char *buffer, ssize_t data_size) {
 }
 
 void handle_packet(int sockfd, const char *buffer, ssize_t data_size) {
-    unsigned char length = buffer[0];
+    // The packet length would be an unsigned packet at buffer[0].
     unsigned char packet_id = buffer[1];
 
     switch (packet_id) {
@@ -184,13 +184,14 @@ void handle_packet(int sockfd, const char *buffer, ssize_t data_size) {
         case 0x01:
             printf("Packet type: Ping Request\n");
             handle_ping(sockfd, buffer, data_size);
-            close(sockfd); // close connection after ping packet!
+            // Connection is closed in the caller funcion (begin_listen)
             break;
         default:
             printf("Packet type: unknown\n");
             break;
     }
 }
+
 
 void update_json_response(const char* ip) {
     int max_players = 8;
@@ -207,9 +208,16 @@ void update_json_response(const char* ip) {
     static char buffer[200];  // Adjust this size if needed
     int bytes_written = snprintf(buffer, sizeof(buffer), json, max_players, online_players, description);
 
+    if (bytes_written < 0) {
+        printf("Failed to write MOTD/description into buffer. Aborting...\n");
+        exit(EXIT_FAILURE);
+    }
+
+
     // Check if the resulting JSON is longer than the buffer size
-    if (bytes_written >= sizeof(buffer)) {
-        printf("JSON response is too long, >127 characters. Aborting...");
+    if (bytes_written >= (int)sizeof(buffer)) {
+        printf("JSON response is too long. Required: %d, Buffer size: %zu. Aborting...\n", 
+               bytes_written, sizeof(buffer));
         exit(EXIT_FAILURE);
     }
 
@@ -228,7 +236,7 @@ void update_json_response(const char* ip) {
 unsigned short get_port(int argc, char* argv[]) {
     const unsigned short DEFAULT_PORT = 25565;
 
-    char* error_message = "Invalid CLI option. Use ./honeypot -p <port> (or --port)";
+    char* error_message = "Invalid CLI option. Use ./honeypot -p <port> (or --port)\n";
 
     if (argc == 1) {
         return DEFAULT_PORT;
@@ -236,14 +244,14 @@ unsigned short get_port(int argc, char* argv[]) {
 
     // If there are more than 3 args, it's malformed.
     if (argc != 3) {
-        printf("%s", error_message);
+        printf("%s\n", error_message);
         exit(EXIT_FAILURE);
     }
 
 
     // ./honeypot --port 29844
     if (strcmp(argv[2], "-p") != 0 && strcmp(argv[2], "--port") != 0) {
-        printf("%s", error_message);
+        printf("%s\n", error_message);
         exit(EXIT_FAILURE);
     }
 
@@ -252,7 +260,7 @@ unsigned short get_port(int argc, char* argv[]) {
     // Attempt to convert the first string
     unsigned long number = strtoul(argv[2], &endptr, 10);
     if (endptr == argv[2] || number > 65535) {
-        printf("Invalid port range. (Range is from 0 to 65,535)");
+        printf("Invalid port range. (Range is from 0 to 65,535)\n");
         exit(EXIT_FAILURE);
     }
 
