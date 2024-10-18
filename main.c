@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -7,7 +8,7 @@
 #include <arpa/inet.h>
 #include <time.h>
 
-char ip[512];
+static char json_response_buffer[0xFF]; // 255
 
 char *get_client_ip(int client_sockfd) {
     struct sockaddr_in client_addr;
@@ -25,7 +26,7 @@ char *get_client_ip(int client_sockfd) {
 
 int log_ip(const char *ip) {
     const char *filename = "logged_ips.txt";
-    FILE *file = fopen(filename, "a"); // Open for appending
+    FILE *file = fopen(filename, "a"); // Open file in appending mode.
     if (file == NULL) {
         perror("Failed to open file");
         return -1;
@@ -131,7 +132,7 @@ int handle_handshake(int sockfd, const char *buffer, ssize_t data_size) {
     }
 
     unsigned char packet_id = 0x00;
-    unsigned char response_length = (unsigned char) strlen(ip);
+    unsigned char response_length = (unsigned char) strlen(json_response_buffer);
     unsigned char length = 1 + 1 + response_length; // packet_id (1 byte) + length byte (1 byte) + response
     unsigned char total_packet_length = 1 + length; // length byte + the actual length
     unsigned char status_response_packet[total_packet_length];
@@ -140,7 +141,7 @@ int handle_handshake(int sockfd, const char *buffer, ssize_t data_size) {
     status_response_packet[1] = packet_id;
     status_response_packet[2] = response_length;
 
-    memcpy(status_response_packet + 3, ip, response_length); // put all string into packet.
+    memcpy(status_response_packet + 3, json_response_buffer, response_length); // put all string into packet.
 
     ssize_t sent_bytes = send(sockfd, status_response_packet, total_packet_length, 0);
     if (sent_bytes != total_packet_length) {
@@ -189,50 +190,121 @@ void handle_packet(int sockfd, const char *buffer, ssize_t data_size) {
     }
 }
 
+void update_json_response(const char* ip) {
+    int max_players = 8;
+    int online_players = 6;
+    char* description_template = "Your IP is: %s";
 
-void update_description(const char *new_ip) {
-    snprintf(ip, sizeof(ip),
-             "{\"version\":{\"name\":\"1.21\",\"protocol\":767},\"players\":{\"max\":8,\"online\":6},\"description\":{\"text\":\"Your ip: %s\"}}",
-             new_ip);
+    // Prepare the description with IP
+    char description[50];
+    snprintf(description, sizeof(description), description_template, ip);
+
+    char* json = "{\"version\":{\"name\":\"1.21\",\"protocol\":767},\"players\":{\"max\":%d,\"online\":%d},\"description\":{\"text\":\"%s\"}}";
+
+    // Static buffer to hold the generated JSON
+    static char buffer[200];  // Adjust this size if needed
+    int bytes_written = snprintf(buffer, sizeof(buffer), json, max_players, online_players, description);
+
+    // Check if the resulting JSON is longer than the buffer size
+    if (bytes_written >= sizeof(buffer)) {
+        printf("JSON response is too long, >127 characters. Aborting...");
+        exit(EXIT_FAILURE);
+    }
+
+    // Check if the JSON exceeds 0111 1111 which is 127 bytes (VarInt limitation)
+    // And we have not implented VarInts.
+    if (bytes_written > (0xFF >> 1)) {  // 127
+        printf("Response JSON length is greater than 127, undefined behavior, aborting...\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Safely copy the generated JSON into the final json_response_buffer
+    snprintf(json_response_buffer, sizeof(json_response_buffer), "%s", buffer);
 }
 
-const unsigned short LISTENING_PORT = 25565;
 
-int main(void) {
-    printf("Server started on port %d\n", LISTENING_PORT);
-    int server_sockfd = get_server_socket(LISTENING_PORT);
+unsigned short get_port(int argc, char* argv[]) {
+    const unsigned short DEFAULT_PORT = 25565;
+    
+    if (argc <= 2) {
+        return DEFAULT_PORT;
+    }
+
+    char* error_message = "Invalid CLI option. Use ./honeypot -p <port> (or --port)";
+    for (size_t i; i < argc; i++) {
+        if (strcmp(argv[i], "-p") != 0 && strcmp(argv[i], "--port") != 0) {
+            printf("%s", error_message);
+            exit(EXIT_FAILURE);
+        }
+        char* endptr;
+
+        // Attempt to convert the first string
+        unsigned long number = strtoul(argv[i], &endptr, 10);
+        if (endptr == argv[i] || number > 65535) {
+            printf("Invalid port range. (Range is from 0 to 65,535)");
+            exit(EXIT_FAILURE);
+        }
+
+        return (unsigned short)number;
+    }
+}
+
+
+// Infinitely listening for connections.
+void begin_listen(int server_sockfd) {
+    // As we are a synchrounous app, it is fine to share a buffer for whole program's lifetime.
+    static char buffer[1024] = {0};
 
     while (1) {
         int client_sockfd = get_client_socket(server_sockfd);
-        const char *ip_ = get_client_ip(client_sockfd);
-        log_ip(ip_);
-        update_description(ip_);
+        const char *client_ip = get_client_ip(client_sockfd);
+        log_ip(client_ip);
+        update_json_response(client_ip);
 
         if (client_sockfd < 0) {
             perror("Failed to accept client connection");
             continue;
         }
 
-        while (1) {
-            char buffer[1024] = {0};
-            ssize_t received_bytes = receive_from_socket(client_sockfd, buffer, sizeof(buffer));
-            if (received_bytes > 0) {
-                printf("Received %ld bytes\n", received_bytes);
-                handle_packet(client_sockfd, buffer, received_bytes);
-            } else if (received_bytes == 0) {
-                printf("Connection closed by client\n");
-                break;
-            } else {
-                printf("Error receiving data\n");
-                break;
-            }
-            printf("\n---\n\n");
+
+        ssize_t received_bytes = receive_from_socket(client_sockfd, buffer, sizeof(buffer));
+
+        // We could put this if, elif, else block into an infinite loop, so that the server still thinks
+        // we are a legit server, however, we are not threaded/async so we only can handle ONE connection at a time.
+        // Hence, we close the socket just after sending the MOTD/description, the only side effect is that the small
+        // icon that's normally green and displays ping in ms when mouse is hovered will be gray and "loading".
+        // But this is fine, since we have deceived successfully the client by grabbing its IP.
+        //
+        // We effectively make the CPU work only for constructing the MOTD/description and sending it.
+        if (received_bytes > 0) {
+            printf("Received %ld bytes\n", received_bytes);
+            handle_packet(client_sockfd, buffer, received_bytes);
+
+        } else if (received_bytes == 0) {
+            printf("Connection closed by client\n");
+            break;
+
+        } else {
+            printf("Error receiving data\n");
+            break;
         }
 
         close(client_sockfd);
+
+        printf("\n***********************************************\n\n");
     }
+}
+
+
+int main(int argc, char **argv) {
+    unsigned short listening_port = get_port(argc, argv);
+    printf("Listening on 0.0.0.0:%d...", listening_port);
+
+    int server_sockfd = get_server_socket(listening_port);
+
+    // This function contains an infinite loop.
+    begin_listen(server_sockfd);
 
     close(server_sockfd);
     return 0;
 }
-
