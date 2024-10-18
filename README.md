@@ -17,7 +17,7 @@ Simple Minecraft honeypot (IP logger) written in C.
 
 - Linux: Working
 - macOS: Not Tested (but should work)
-- Windows: Not Tested (but should work)
+- Windows: Not Working (as we are using `sys/socket.h`, a POSIX-specific header not available on Windows)
 
 ## Minecraft clients
 
