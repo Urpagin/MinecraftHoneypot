@@ -41,7 +41,7 @@ For more detail, please read the blog post in the ["Why" section](#why).
 
 # Code Quality Disclaimer
 
-I have never properly learnt C, nor made any project in that language. That said, the code works, but I highly doubt the quality of it.
+I have never properly learnt C, nor made any project in that language. That said, the code works, but I doubt the quality of it.
 
 # Why
 
