@@ -8,7 +8,11 @@
 #include <arpa/inet.h>
 #include <time.h>
 
-static char json_response_buffer[0xFF]; // 255
+// 255
+static char json_response_buffer[0xFF];
+
+// Will be incremented by 1 each time a new client tries to connect.
+static unsigned long connection_count = 0;
 
 char *get_client_ip(int client_sockfd) {
     struct sockaddr_in client_addr;
@@ -91,7 +95,7 @@ int get_server_socket(unsigned short port) {
     return sockfd;
 }
 
-// listens on server socket and returns client socket when connection.
+// Listens on server socket and returns client socket when there is a connection.
 int get_client_socket(int sockfd) {
     if (listen(sockfd, 15) < 0)
         return -1;
@@ -99,14 +103,9 @@ int get_client_socket(int sockfd) {
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
 
-    // attempt to accept a new connection
-    int client_socket = accept(sockfd, (struct sockaddr *) &client_addr, &client_len);
-    if (client_socket < 0) {
-        perror("accept failed");
-        return -1;
-    }
-
-    return client_socket; // return the new socket descriptor for the accepted connection
+    // Attempt to accept a new connection
+    // Return the new socket descriptor for the accepted connection
+    return accept(sockfd, (struct sockaddr *) &client_addr, &client_len);
 }
 
 ssize_t receive_from_socket(int sockfd, char *buffer, size_t buffer_size) {
@@ -225,20 +224,22 @@ void update_json_response(const char* ip) {
 
 unsigned short get_port(int argc, char* argv[]) {
     const unsigned short DEFAULT_PORT = 25565;
-   
+
     char* error_message = "Invalid CLI option. Use ./honeypot -p <port> (or --port)";
 
     if (argc == 1) {
         return DEFAULT_PORT;
     }
 
-    if (argc > 3) {
+    // If there are more than 3 args, it's malformed.
+    if (argc != 3) {
         printf("%s", error_message);
         exit(EXIT_FAILURE);
     }
 
 
-    if (strcmp(argv[1], "-p") != 0 && strcmp(argv[1], "--port") != 0) {
+    // ./honeypot --port 29844
+    if (strcmp(argv[2], "-p") != 0 && strcmp(argv[2], "--port") != 0) {
         printf("%s", error_message);
         exit(EXIT_FAILURE);
     }
@@ -246,8 +247,8 @@ unsigned short get_port(int argc, char* argv[]) {
     char* endptr;
 
     // Attempt to convert the first string
-    unsigned long number = strtoul(argv[1], &endptr, 10);
-    if (endptr == argv[1] || number > 65535) {
+    unsigned long number = strtoul(argv[2], &endptr, 10);
+    if (endptr == argv[2] || number > 65535) {
         printf("Invalid port range. (Range is from 0 to 65,535)");
         exit(EXIT_FAILURE);
     }
@@ -262,18 +263,25 @@ void begin_listen(int server_sockfd) {
     static char buffer[1024] = {0};
 
     while (1) {
+        // Wait for new client...
         int client_sockfd = get_client_socket(server_sockfd);
-        const char *client_ip = get_client_ip(client_sockfd);
-        log_ip(client_ip);
-        update_json_response(client_ip);
 
         if (client_sockfd < 0) {
             perror("Failed to accept client connection");
             continue;
         }
 
-
         ssize_t received_bytes = receive_from_socket(client_sockfd, buffer, sizeof(buffer));
+
+        // Print new connection
+        printf("\n********************%lu********************\n\n", connection_count);
+        connection_count++;
+
+        // Get IP, log IP, update MOTD
+        const char *client_ip = get_client_ip(client_sockfd);
+        log_ip(client_ip);
+        update_json_response(client_ip);
+
 
         // We could put this if, elif, else block into an infinite loop, so that the server still thinks
         // we are a legit server, however, we are not threaded/async so we only can handle ONE connection at a time.
@@ -288,23 +296,19 @@ void begin_listen(int server_sockfd) {
 
         } else if (received_bytes == 0) {
             printf("Connection closed by client\n");
-            break;
 
         } else {
             printf("Error receiving data\n");
-            break;
         }
 
         close(client_sockfd);
-
-        printf("\n***********************************************\n\n");
     }
 }
 
 
 int main(int argc, char **argv) {
     unsigned short listening_port = get_port(argc, argv);
-    printf("Listening on 0.0.0.0:%d...", listening_port);
+    printf("Listening on 0.0.0.0:%d...\n", listening_port);
 
     int server_sockfd = get_server_socket(listening_port);
 
