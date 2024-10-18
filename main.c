@@ -239,18 +239,21 @@ unsigned short get_port(int argc, char* argv[]) {
     char* error_message = "Invalid CLI option. Use ./honeypot -p <port> (or --port)\n";
 
     if (argc == 1) {
+        printf("argc = 1\n");
         return DEFAULT_PORT;
     }
 
     // If there are more than 3 args, it's malformed.
     if (argc != 3) {
+        printf("argc != 3\n");
         printf("%s\n", error_message);
         exit(EXIT_FAILURE);
     }
 
 
     // ./honeypot --port 29844
-    if (strcmp(argv[2], "-p") != 0 && strcmp(argv[2], "--port") != 0) {
+    if (strcmp(argv[1], "-p") != 0 && strcmp(argv[1], "--port") != 0) {
+        printf("not -p or not --port\n");
         printf("%s\n", error_message);
         exit(EXIT_FAILURE);
     }
