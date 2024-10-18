@@ -34,10 +34,13 @@ But then, by accepting a connection the client gives out its IP address, after t
 For more detail, please read the blog post in the ["Why" section](#why).
 
 # Illustrations
+![minecraft multiplayer servers tab](https://github.com/user-attachments/assets/3835e530-88ab-4fb0-b5a0-1bb2d20cabe7)
 
-![image](https://github.com/Urpagin/MinecraftHoneypot/assets/72459611/54924378-507e-4e4a-b1fa-f68598c2c0f2)
+*(Note: The ping indicator is not green by design. Please refer to the code for more details.)*
 
-![image](https://github.com/Urpagin/MinecraftHoneypot/assets/72459611/0a5a6993-2d1d-4c07-85cf-4964f43631ed)
+![ip logs](https://github.com/Urpagin/MinecraftHoneypot/assets/72459611/0a5a6993-2d1d-4c07-85cf-4964f43631ed)
+
+*(Note: I only used the honeypot locally, which is why all the addresses are 127.0.0.1.)*
 
 # Code Quality Disclaimer
 
