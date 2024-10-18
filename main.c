@@ -111,7 +111,7 @@ int get_client_socket(int sockfd) {
 ssize_t receive_from_socket(int sockfd, char *buffer, size_t buffer_size) {
     ssize_t bytes_received = recv(sockfd, buffer, buffer_size, 0);
     if (bytes_received < 0) {
-        perror("recv failed");
+        perror("[handshake] recv() failed");
         return -1;
     }
 
@@ -120,13 +120,14 @@ ssize_t receive_from_socket(int sockfd, char *buffer, size_t buffer_size) {
 
 int handle_handshake(int sockfd, const char *buffer, ssize_t data_size) {
     if (data_size <= 0) {
-        perror("[handshake] data size negative or zero");
+        perror("[handshake] Data size negative or zero");
         return -1;
     }
+
     unsigned char next_state = buffer[data_size - 1]; // last byte is next state. '-1' : 0 indexed arrays
-    printf("nextstate: %d\n", (int) next_state);
+
     if (next_state != 1) {
-        printf("[handshake] next state is not status\n");
+        printf("[handshake] Next state is not status\n");
         return -1;
     }
 
@@ -140,20 +141,22 @@ int handle_handshake(int sockfd, const char *buffer, ssize_t data_size) {
     status_response_packet[1] = packet_id;
     status_response_packet[2] = response_length;
 
-    memcpy(status_response_packet + 3, json_response_buffer, response_length); // put all string into packet.
+    memcpy(status_response_packet + 3, json_response_buffer, response_length); // Pack everything into the packet.
 
     ssize_t sent_bytes = send(sockfd, status_response_packet, total_packet_length, 0);
     if (sent_bytes != total_packet_length) {
-        perror("send failed");
+        perror("[handshake] Failed to send the packet");
         return -1;
     } else {
         printf("[handshake] Sent %d bytes!\n", (int) sent_bytes);
     }
+
     return 0;
 }
 
 int handle_ping(int sockfd, const char *buffer, ssize_t data_size) {
-    if (data_size < 9) { // Ensure there's enough data for one byte of length + 8 bytes of long
+    // Ensure there is enough for a byte (1) + a long (8)
+    if (data_size < 9) {
         return -1;
     }
 
@@ -161,10 +164,10 @@ int handle_ping(int sockfd, const char *buffer, ssize_t data_size) {
 
     ssize_t bytes_transferred = send(sockfd, buffer, data_size, 0);
     if (bytes_transferred != length + 1) {
-        perror("send failed");
+        perror("[handle_ping] send() failed");
         return -1;
     }
-    printf("sent %d bytes\n", (int) bytes_transferred);
+    printf("[handle_ping] Sent %d bytes!\n", (int) bytes_transferred);
 
     return 0;
 }
