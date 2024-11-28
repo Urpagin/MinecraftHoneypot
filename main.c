@@ -1,3 +1,5 @@
+#include <asm-generic/socket.h>
+#include <bits/types/struct_timeval.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -7,12 +9,23 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <time.h>
+#include <errno.h>
+
+// As we are a synchrounous app, it is fine to share a buffer for the whole program's lifetime.
+static char buffer[1024] = {0};
 
 // 255
 static char json_response_buffer[0xFF];
 
 // Will be incremented by 1 each time a new client tries to connect.
 static unsigned long connection_count = 0;
+
+// The time waiting for a new packet from the client before timing out.
+static unsigned long RECV_TIMOUT_MS = 200;
+
+// Since we are handling ONE connection at a time, this is valid
+// The state switches from Handshake status to Status.
+static bool is_state_status = false;
 
 char *get_client_ip(int client_sockfd) {
     struct sockaddr_in client_addr;
@@ -71,7 +84,7 @@ int log_ip(const char *ip) {
 int get_server_socket(unsigned short port) {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
-        perror("socket creation failed");
+        perror("Socket creation failed");
         exit(EXIT_FAILURE);
     }
 
@@ -87,48 +100,82 @@ int get_server_socket(unsigned short port) {
     server_addr.sin_addr.s_addr = INADDR_ANY; // listen on any network interface
 
     if (bind(sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
-        perror("bind failed");
+        perror("Bind failed");
         close(sockfd);
+        printf("--> [get_server_socket] Closed socket\n");
         exit(EXIT_FAILURE);
     }
 
     return sockfd;
 }
 
-// Listens on server socket and returns client socket when there is a connection.
+// Listens on server socket and returns client socket when there is a connection
+// and set a timeout.
 int get_client_socket(int sockfd) {
-    if (listen(sockfd, 15) < 0)
+    if (listen(sockfd, 15) < 0) {
+        perror("[get_client_socket] Error on listen");
         return -1;
+    }
 
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
 
     // Attempt to accept a new connection
+    int client_sock = accept(sockfd, (struct sockaddr *)&client_addr, &client_len);
+    if (client_sock < 0) {
+        perror("[get_client_socket] Error on accept");
+        return -1;
+    }
+
+    // Set a timeout for recv on the client socket
+    struct timeval timeout;
+    timeout.tv_sec = 0;                       // Seconds
+    timeout.tv_usec = RECV_TIMOUT_MS * 1000;  // RECV_TIMEOUT in microseconds
+    
+    if (setsockopt(client_sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        perror("[get_client_socket] Error setting timeout");
+        close(client_sock);
+        printf("--> [get_client_socket] Closed socket\n");
+        return -1;
+    }
+
     // Return the new socket descriptor for the accepted connection
-    return accept(sockfd, (struct sockaddr *) &client_addr, &client_len);
+    return client_sock;
 }
 
+// Listens for a packet from socket. A timeout is set from the get_client_socket() function.
+// If the socket does not respond within the timeframe, it returns -1
 ssize_t receive_from_socket(int sockfd, char *buffer, size_t buffer_size) {
     ssize_t bytes_received = recv(sockfd, buffer, buffer_size, 0);
-    if (bytes_received < 0) {
-        perror("[handshake] recv() failed");
-        return -1;
+
+    if (bytes_received >= 0) {
+        return bytes_received;
+    }
+
+
+    // From now on, we know recv() returned -1 (an error)
+
+
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        // Timout occurred
+        fprintf(stderr, "[receive_from_socket] recv() timeout: No response within the timeframe\n");
+    } else {
+        perror("[receive_from_socket] recv() failed");
     }
 
     return bytes_received;
 }
 
-int handle_handshake(int sockfd, const char *buffer, ssize_t data_size) {
+int handle_status_request(int sockfd, const char *buffer, ssize_t data_size) {
     if (data_size <= 0) {
-        perror("[handshake] Data size negative or zero");
+        perror("[handle_status_request] Data size negative or zero");
         return -1;
     }
 
-    unsigned char next_state = buffer[data_size - 1]; // last byte is next state. '-1' : 0 indexed arrays
-
-    if (next_state != 1) {
-        printf("[handshake] Next state is not status\n");
-        return -1;
+    // https://wiki.vg/Protocol#Status_Request
+    // That is, Lenght (1 Byte) + PacketId (1 Byte)
+    if (data_size != 2) {
+        fprintf(stderr, "[handle_status_request] Packet is not 2 bytes long\n");
     }
 
     unsigned char packet_id = 0x00;
@@ -145,52 +192,37 @@ int handle_handshake(int sockfd, const char *buffer, ssize_t data_size) {
 
     ssize_t sent_bytes = send(sockfd, status_response_packet, total_packet_length, 0);
     if (sent_bytes != total_packet_length) {
-        perror("[handshake] Failed to send the packet");
+        perror("[handle_status_request] Failed to send the packet");
         return -1;
     } else {
-        printf("[handshake] Sent %d bytes!\n", (int) sent_bytes);
+        printf("[handle_status_request] Successfully sent the Status Response packet. Sent %zd bytes!\n", sent_bytes);
     }
-
     return 0;
 }
 
+// Sends the Ping Response packet to the socket which is the same as the received Ping Request
+// packet the client sent.
 int handle_ping(int sockfd, const char *buffer, ssize_t data_size) {
-    // Ensure there is enough for a byte (1) + a long (8)
-    if (data_size < 9) {
-        return -1;
+    // Packet Length (PacketID len + Payload len) which should be 9.
+    unsigned char length = buffer[0];
+
+    // Warnings
+    if (length != 9) {
+        perror("[handle_ping] Ping Request packet is not of length 9!");
     }
 
-    unsigned char length = buffer[0]; // Assuming this is the length of the following payload (which should be 8 here)
-
+    // Send back the client's packet
     ssize_t bytes_transferred = send(sockfd, buffer, data_size, 0);
-    if (bytes_transferred != length + 1) {
-        perror("[handle_ping] send() failed");
+    if (bytes_transferred == -1) {
+        perror("[handle_ping] send() failed, got -1 bytes sent");
         return -1;
     }
-    printf("[handle_ping] Sent %d bytes!\n", (int) bytes_transferred);
+
+    printf("[handle_ping] Successfully sent the Ping Response packet. Sent %ld bytes\n", bytes_transferred);
 
     return 0;
 }
 
-void handle_packet(int sockfd, const char *buffer, ssize_t data_size) {
-    // The packet length would be an unsigned packet at buffer[0].
-    unsigned char packet_id = buffer[1];
-
-    switch (packet_id) {
-        case 0x00:
-            printf("Packet type: Handshake\n");
-            handle_handshake(sockfd, buffer, data_size);
-            break;
-        case 0x01:
-            printf("Packet type: Ping Request\n");
-            handle_ping(sockfd, buffer, data_size);
-            // Connection is closed in the caller funcion (begin_listen)
-            break;
-        default:
-            printf("Packet type: unknown\n");
-            break;
-    }
-}
 
 
 void update_json_response(const char* ip) {
@@ -233,6 +265,72 @@ void update_json_response(const char* ip) {
 }
 
 
+// Called when a handshake packet is detected.
+//
+// Logs IP and updates the MOTD with the IP.
+void handle_handshake(int sockfd, const char *buffer, ssize_t data_size) {
+    unsigned char next_state = buffer[data_size - 1]; // last byte is next state. '-1' : 0 indexed arrays
+
+    if (next_state != 1) {
+        printf("[handle_handshake] Next state is not status\n");
+        return;
+    }
+
+    // Get IP + log IP + update MOTD
+    // when we are sure that the client is sending a Handshake packet.
+    const char *client_ip = get_client_ip(sockfd);
+    log_ip(client_ip);
+    update_json_response(client_ip);
+
+    // The state switches to Status just after the handshake.
+    is_state_status = true;
+}
+
+
+// Dispatches the packet by parsing its PacketID.
+//
+// 0 -> Handshake packet.
+// 1 -> Ping Request packet.
+void handle_packet(int sockfd, const char *buffer, ssize_t data_size) {
+    // Standard packet layout:
+    // Length [VarInt](PacketID len + Payload len)
+    // PacketID [VarInt]
+    // Data [Byte Array]
+
+    // Since we are only interested in Handshake packets, the Length will always be strictly less
+    // than 128, thus, we are certain the Length in contained in the first byte only.
+    unsigned char packet_id = buffer[1];
+
+    // TODO: Switch this logic. Only respond to the client when it sends
+    // the Status Request packet.
+    // And the Handshake packet only switches the global state flag!!
+
+    switch (packet_id) {
+        case 0x00:
+            // We are in the Handshake state.
+            if (!is_state_status) {
+                printf("Packet type: Handshake\n");
+                handle_handshake(sockfd, buffer, data_size);
+                return;
+            }
+
+            // If the flag is set to true, we are in the Status state,
+            // we will respond to the client.
+            printf("Packet type: Status Request\n");
+            handle_status_request(sockfd, buffer, data_size);
+            break;
+        case 0x01:
+            printf("Packet type: Ping Request\n");
+            handle_ping(sockfd, buffer, data_size);
+            // Connection is closed in the caller funcion (begin_listen)
+            break;
+        default:
+            printf("Packet type: unknown\n");
+            break;
+    }
+}
+
+
 unsigned short get_port(int argc, char* argv[]) {
     const unsigned short DEFAULT_PORT = 25565;
 
@@ -268,51 +366,53 @@ unsigned short get_port(int argc, char* argv[]) {
 }
 
 
+// Listens for incomming packets on the socket.
+int handle_connection(int sockfd) {
+    // Infinite loop for packets
+    while (1) {
+        // Wait for new packets...
+        ssize_t read_bytes = receive_from_socket(sockfd, buffer, sizeof(buffer));
+
+
+        if (read_bytes > 0) {
+            printf("Received %ld bytes\n", read_bytes);
+            handle_packet(sockfd, buffer, read_bytes);
+
+        } else if (read_bytes == 0) {
+            // Connection closed by client
+            return read_bytes;
+
+        } else {
+            // Got a negative amount
+            printf("Error receiving data, got %ld bytes\n", read_bytes);
+            return read_bytes;
+        }
+    }
+}
+
+
 // Infinitely listening for connections.
 void begin_listen(int server_sockfd) {
-    // As we are a synchrounous app, it is fine to share a buffer for whole program's lifetime.
-    static char buffer[1024] = {0};
-
+    // Infinite loop for connections
     while (1) {
-        // Wait for new client...
+        // Wait for new connection...
         int client_sockfd = get_client_socket(server_sockfd);
 
-        if (client_sockfd < 0) {
-            perror("Failed to accept client connection");
-            continue;
-        }
-
-        ssize_t received_bytes = receive_from_socket(client_sockfd, buffer, sizeof(buffer));
 
         // Print new connection
         printf("\n********************%lu********************\n\n", connection_count);
         connection_count++;
 
-        // Get IP, log IP, update MOTD
-        const char *client_ip = get_client_ip(client_sockfd);
-        log_ip(client_ip);
-        update_json_response(client_ip);
-
-
-        // We could put this if, elif, else block into an infinite loop, so that the server still thinks
-        // we are a legit server, however, we are not threaded/async so we only can handle ONE connection at a time.
-        // Hence, we close the socket just after sending the MOTD/description, the only side effect is that the small
-        // icon that's normally green and displays ping in ms when mouse is hovered will be gray and "loading".
-        // But this is fine, since we have deceived successfully the client by grabbing its IP.
-        //
-        // We effectively make the CPU work only for constructing the MOTD/description and sending it.
-        if (received_bytes > 0) {
-            printf("Received %ld bytes\n", received_bytes);
-            handle_packet(client_sockfd, buffer, received_bytes);
-
-        } else if (received_bytes == 0) {
-            printf("Connection closed by client\n");
-
+        if (handle_connection(client_sockfd) == 0) {
+            printf("--> Connection closed by client\n");
         } else {
-            printf("Error receiving data\n");
+            printf("--> Connection closed\n");
         }
 
         close(client_sockfd);
+
+        // Reset the global state.
+        is_state_status = false;
     }
 }
 
