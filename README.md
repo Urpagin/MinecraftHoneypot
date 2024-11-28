@@ -25,6 +25,8 @@ According to the [Minecraft protocol wiki](https://wiki.vg/Server_List_Ping), th
 
 This implementation is compatible with Minecraft Java Edition versions 1.7 and newer, as per the [Minecraft protocol wiki](https://wiki.vg/Server_List_Ping).
 
+You can change the server version by modifying the JSON in the source code, by changing the `name` and `protocol` fields.
+
 # How does it work?
 
 First, the program mimics the Minecraft [Server List Ping (SLP)](https://wiki.vg/Server_List_Ping) protocol, to only implement the part that accepts a TCP connection and sends back the bare minimum.
@@ -34,9 +36,8 @@ But then, by accepting a connection the client gives out its IP address, after t
 For more detail, please read the blog post in the ["Why" section](#why).
 
 # Illustrations
-![minecraft multiplayer servers tab](https://github.com/user-attachments/assets/3835e530-88ab-4fb0-b5a0-1bb2d20cabe7)
+![minecraft multiplayer servers tab](https://github.com/user-attachments/assets/38b2988a-daf1-42ea-aaf6-c2e0b379d481)
 
-*(Note: The ping indicator is not green by design. Please refer to the code for more details.)*
 
 ![ip logs](https://github.com/Urpagin/MinecraftHoneypot/assets/72459611/0a5a6993-2d1d-4c07-85cf-4964f43631ed)
 
