@@ -14,8 +14,8 @@
 // As we are a synchrounous app, it is fine to share a buffer for the whole program's lifetime.
 static char buffer[1024] = {0};
 
-// 255
-static char json_response_buffer[0xFF];
+// Array that will contains the custom MOTD containing the client's IP.
+static char json_response_buffer[255];
 
 // Will be incremented by 1 each time a new client tries to connect.
 static unsigned long connection_count = 0;
@@ -94,7 +94,7 @@ int get_server_socket(unsigned short port) {
     }
 
     struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr)); // set the memory to all zeroes.
+    memset(&server_addr, 0, sizeof(server_addr)); 
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(port);
     server_addr.sin_addr.s_addr = INADDR_ANY; // listen on any network interface
@@ -166,7 +166,7 @@ ssize_t receive_from_socket(int sockfd, char *buffer, size_t buffer_size) {
     return bytes_received;
 }
 
-int handle_status_request(int sockfd, const char *buffer, ssize_t data_size) {
+int handle_status_request(int sockfd, ssize_t data_size) {
     if (data_size <= 0) {
         perror("[handle_status_request] Data size negative or zero");
         return -1;
@@ -234,7 +234,7 @@ void update_json_response(const char* ip) {
     char description[50];
     snprintf(description, sizeof(description), description_template, ip);
 
-    char* json = "{\"version\":{\"name\":\"1.21\",\"protocol\":767},\"players\":{\"max\":%d,\"online\":%d},\"description\":{\"text\":\"%s\"}}";
+    const char* json = "{\"version\":{\"name\":\"1.21\",\"protocol\":767},\"players\":{\"max\":%d,\"online\":%d},\"description\":{\"text\":\"%s\"}}";
 
     // Static buffer to hold the generated JSON
     static char buffer[200];  // Adjust this size if needed
@@ -317,7 +317,7 @@ void handle_packet(int sockfd, const char *buffer, ssize_t data_size) {
             // If the flag is set to true, we are in the Status state,
             // we will respond to the client.
             printf("Packet type: Status Request\n");
-            handle_status_request(sockfd, buffer, data_size);
+            handle_status_request(sockfd, data_size);
             break;
         case 0x01:
             printf("Packet type: Ping Request\n");
