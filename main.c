@@ -94,7 +94,7 @@ int get_server_socket(unsigned short port) {
     }
 
     struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr)); 
+    memset(&server_addr, 0, sizeof(server_addr)); // Set this chunk of memory to be zeroes
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(port);
     server_addr.sin_addr.s_addr = INADDR_ANY; // listen on any network interface
