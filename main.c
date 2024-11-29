@@ -1,4 +1,3 @@
-#include <asm-generic/socket.h>
 #include <bits/types/struct_timeval.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -11,17 +10,20 @@
 #include <time.h>
 #include <errno.h>
 
+
 // As we are a synchrounous app, it is fine to share a buffer for the whole program's lifetime.
-static char buffer[1024] = {0};
+#define BUFFER_SIZE 1024
+static char buffer[BUFFER_SIZE] = {0};
 
 // Array that will contains the custom MOTD containing the client's IP.
-static char json_response_buffer[255];
+#define JSON_BUFFER_SIZE 255
+static char json_response_buffer[JSON_BUFFER_SIZE];
 
 // Will be incremented by 1 each time a new client tries to connect.
 static unsigned long connection_count = 0;
 
 // The time waiting for a new packet from the client before timing out.
-static unsigned long RECV_TIMOUT_MS = 200;
+const static unsigned long RECV_TIMOUT_MS = 200;
 
 // Since we are handling ONE connection at a time, this is valid
 // The state switches from Handshake status to Status.
@@ -41,7 +43,7 @@ char *get_client_ip(int client_sockfd) {
     return client_ip;
 }
 
-int log_ip(const char *ip) {
+int log_ip(const char *ipAddress) {
     const char *filename = "logged_ips.txt";
     FILE *file = fopen(filename, "a"); // Open file in appending mode.
     if (file == NULL) {
@@ -56,7 +58,7 @@ int log_ip(const char *ip) {
     strftime(formatted_time, sizeof(formatted_time), "[%Y-%m-%d %H:%M:%S] - ", tm_now);
 
     // prepare the final string with a newline
-    size_t ip_len = strlen(ip);
+    size_t ip_len = strlen(ipAddress);
     size_t time_len = strlen(formatted_time);
     size_t total_len = time_len + ip_len + 2; // include '\n' and '\0'
     char *line = malloc(total_len); // dynamically allocate to fit the full line
@@ -68,7 +70,7 @@ int log_ip(const char *ip) {
 
     // Construct the line to be logged
     strcpy(line, formatted_time);
-    strcat(line, ip);
+    strcat(line, ipAddress);
     strcat(line, "\n"); // Append newline
 
     // Write to the file
@@ -194,9 +196,11 @@ int handle_status_request(int sockfd, ssize_t data_size) {
     if (sent_bytes != total_packet_length) {
         perror("[handle_status_request] Failed to send the packet");
         return -1;
-    } else {
-        printf("[handle_status_request] Successfully sent the Status Response packet. Sent %zd bytes!\n", sent_bytes);
     }
+
+    printf("[handle_status_request] Successfully sent the Status Response packet. Sent %zd bytes!\n", sent_bytes);
+
+
     return 0;
 }
 
