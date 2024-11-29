@@ -51,4 +51,4 @@ I have never properly learnt C, nor made any project in that language. That said
 
 Written for : https://blog.urpagin.net/coding-a-minecraft-honeypot/
 
-Why did I write a blog post? Because I wanted to; there is no other reason.
+I wrote this blog post because experimenting with sockets and Minecraft is genuinely enjoyable!
