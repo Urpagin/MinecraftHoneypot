@@ -47,3 +47,9 @@ I have never properly learnt C, nor have I created any notable projects in that 
 Written for: [https://blog.urpagin.net/coding-a-minecraft-honeypot/](https://blog.urpagin.net/coding-a-minecraft-honeypot/)
 
 I wrote this blog post because experimenting with sockets and Minecraft is genuinely enjoyable!
+
+# Releases Build Command
+
+Here is the command I use to build the releases (>=1.12):
+
+`gcc -O2 -Wall -Wextra -D_FORTIFY_SOURCE=2 -fstack-protector-strong -o honeypot main.c`
