@@ -51,7 +51,7 @@ I wrote this blog post because experimenting with sockets and Minecraft is genui
 
 # Known Bugs
 
-* When the Minecraft client spams the 'Refresh button', the entry corresponding to the honeypot shows as pending.
+* When the Minecraft client spams the 'Refresh' button, the entry corresponding to the honeypot shows as pending.
 
 
 # Releases Build Command
