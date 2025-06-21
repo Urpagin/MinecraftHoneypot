@@ -1,6 +1,6 @@
 # Minecraft Honeypot
 
-A simple Minecraft honeypot (IP logger) written in C.
+A simple **POSIX-compliant** Minecraft honeypot (IP logger) written in C.
 
 # How to Build & Run
 
@@ -47,6 +47,12 @@ I have never properly learnt C, nor have I created any notable projects in that 
 Written for: [https://blog.urpagin.net/coding-a-minecraft-honeypot/](https://blog.urpagin.net/coding-a-minecraft-honeypot/)
 
 I wrote this blog post because experimenting with sockets and Minecraft is genuinely enjoyable!
+
+
+# Known Bugs
+
+* When the Minecraft client spams the 'Refresh button', the entry corresponding to the honeypot shows as pending.
+
 
 # Releases Build Command
 

@@ -1,4 +1,4 @@
-#include <bits/types/struct_timeval.h>
+#include <sys/time.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -23,7 +23,7 @@ static char json_response_buffer[JSON_BUFFER_SIZE];
 static unsigned long connection_count = 0;
 
 // The time waiting for a new packet from the client before timing out.
-static const unsigned long RECV_TIMOUT_MS = 200;
+static const unsigned long RECV_TIMEOUT_MS = 200;
 
 // Since we are handling ONE connection at a time, this is valid
 // The state switches from Handshake status to Status.
@@ -132,7 +132,7 @@ int get_client_socket(int sockfd) {
     // Set a timeout for recv on the client socket
     struct timeval timeout;
     timeout.tv_sec = 0;                       // Seconds
-    timeout.tv_usec = RECV_TIMOUT_MS * 1000;  // RECV_TIMEOUT in microseconds
+    timeout.tv_usec = RECV_TIMEOUT_MS * 1000;  // RECV_TIMEOUT in microseconds
     
     if (setsockopt(client_sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
         perror("[get_client_socket] Error setting timeout");
