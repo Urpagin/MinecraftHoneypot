@@ -56,6 +56,6 @@ I wrote this blog post because experimenting with sockets and Minecraft is genui
 
 # Releases Build Command
 
-Here is the command I use to build the releases (>=1.12):
+Here is the command I use to build the releases (>=1.11):
 
 `gcc -O2 -s -Wall -Wextra -D_FORTIFY_SOURCE=2 -fstack-protector-strong -o honeypot_x86_64_linux_v<version> main.c`
