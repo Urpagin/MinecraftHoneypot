@@ -1,43 +1,38 @@
 # Minecraft Honeypot
 
-Simple Minecraft honeypot (IP logger) written in C.
+A simple Minecraft honeypot (IP logger) written in C.
 
-# How to build
+# How to Build & Run
 
-1. Clone the repo (or download `main.c`)
-
-2. `gcc main.c -o honeypot`
-
+1. Clone the repo (or download `main.c`).
+2. `gcc -O2 -Wall -Wextra -o honeypot main.c`
 3. `./honeypot`
-
 
 # Compatibility
 
 ## Architecture
 
-- Linux: Working
-- macOS: Not Tested (but should work)
-- Windows: Not Working (as we are using `sys/socket.h`, a POSIX-specific header not available on Windows)
+* **Linux:** Working
+* **macOS:** Not tested (but should work)
+* **Windows:** Not working (uses `sys/socket.h`, a POSIX-specific header not available on Windows)
 
-## Minecraft clients
+## Minecraft Clients
 
-According to the [Minecraft protocol wiki](https://wiki.vg/Server_List_Ping), this implementation is compatible from and including Java Edition 1.7 to the latest versions.
+This implementation is compatible with Minecraft Java Edition versions 1.7 and newer, as per the [Minecraft protocol wiki](https://minecraft.wiki/w/Java_Edition_protocol/Server_List_Ping).
 
-This implementation is compatible with Minecraft Java Edition versions 1.7 and newer, as per the [Minecraft protocol wiki](https://wiki.vg/Server_List_Ping).
+You can change the server version by modifying the JSON in the source code (specifically the `name` and `protocol` fields).
 
-You can change the server version by modifying the JSON in the source code, by changing the `name` and `protocol` fields.
+# How Does It Work?
 
-# How does it work?
+First, the program mimics the Minecraft [Server List Ping (SLP)](https://minecraft.wiki/w/Java_Edition_protocol/Server_List_Ping) protocol, implementing only the part that accepts a TCP connection and sends back the bare minimum.
 
-First, the program mimics the Minecraft [Server List Ping (SLP)](https://wiki.vg/Server_List_Ping) protocol, to only implement the part that accepts a TCP connection and sends back the bare minimum.
+By accepting a connection, the client reveals its IP address. The program then logs this address to a file.
 
-But then, by accepting a connection the client gives out its IP address, after that we just log it into a file.
-
-For more detail, please read the blog post in the ["Why" section](#why).
+For more details, please read the blog post in the ["Why" section](#why).
 
 # Illustrations
-![minecraft multiplayer servers tab](https://github.com/user-attachments/assets/38b2988a-daf1-42ea-aaf6-c2e0b379d481)
 
+![minecraft multiplayer servers tab](https://github.com/user-attachments/assets/38b2988a-daf1-42ea-aaf6-c2e0b379d481)
 
 ![ip logs](https://github.com/Urpagin/MinecraftHoneypot/assets/72459611/0a5a6993-2d1d-4c07-85cf-4964f43631ed)
 
@@ -45,10 +40,10 @@ For more detail, please read the blog post in the ["Why" section](#why).
 
 # Code Quality Disclaimer
 
-I have never properly learnt C, nor made any project in that language. That said, the code works, but I doubt the quality of it.
+I have never properly learnt C, nor have I created any notable projects in that language prior to this one. That said, the code works, but I am not confident in its quality.
 
 # Why
 
-Written for : https://blog.urpagin.net/coding-a-minecraft-honeypot/
+Written for: [https://blog.urpagin.net/coding-a-minecraft-honeypot/](https://blog.urpagin.net/coding-a-minecraft-honeypot/)
 
 I wrote this blog post because experimenting with sockets and Minecraft is genuinely enjoyable!
