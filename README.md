@@ -3,10 +3,18 @@
 A simple **POSIX-compliant** Minecraft honeypot (IP logger) written in C.
 
 # How to Build & Run
-
-1. Clone the repo (or download `main.c`).
-2. `gcc -O2 -Wall -Wextra -o honeypot main.c`
-3. `./honeypot`
+1. Clone the repository (or download `main.c`).
+```bash
+git clone https://github.com/Urpagin/MinecraftHoneypot.git
+```
+2. Build the source file.
+```bash
+gcc -O2 -Wall -Wextra -o honeypot main.c
+```
+3. Run the binary
+```bash
+./honeypot
+```
 
 # Compatibility
 
@@ -51,11 +59,12 @@ I wrote this blog post because experimenting with sockets and Minecraft is genui
 
 # Known Bugs
 
-* When the Minecraft client spams the 'Refresh' button, the entry corresponding to the honeypot shows as pending.
+* When the Minecraft client spams the 'Refresh' button, the honeypot entry shows as pending.
 
 
 # Releases Build Command
 
-Here is the command I use to build the releases (>=1.11):
-
-`gcc -O2 -s -Wall -Wextra -D_FORTIFY_SOURCE=2 -fstack-protector-strong -o honeypot_x86_64_linux_v<version> main.c`
+Here is the command used to build the releases (>=1.11):
+```c
+gcc -O2 -s -Wall -Wextra -D_FORTIFY_SOURCE=2 -fstack-protector-strong -o honeypot_x86_64_linux_v<version> main.c
+```
