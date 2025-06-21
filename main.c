@@ -23,7 +23,7 @@ static char json_response_buffer[JSON_BUFFER_SIZE];
 static unsigned long connection_count = 0;
 
 // The time waiting for a new packet from the client before timing out.
-const static unsigned long RECV_TIMOUT_MS = 200;
+static const unsigned long RECV_TIMOUT_MS = 200;
 
 // Since we are handling ONE connection at a time, this is valid
 // The state switches from Handshake status to Status.
