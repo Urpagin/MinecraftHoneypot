@@ -52,4 +52,4 @@ I wrote this blog post because experimenting with sockets and Minecraft is genui
 
 Here is the command I use to build the releases (>=1.12):
 
-`gcc -O2 -Wall -Wextra -D_FORTIFY_SOURCE=2 -fstack-protector-strong -o honeypot main.c`
+`gcc -O2 -Wall -Wextra -D_FORTIFY_SOURCE=2 -fstack-protector-strong -o honeypot_x86_64_linux_v<version> main.c`
